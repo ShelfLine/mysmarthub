@@ -1,7 +1,6 @@
 // ==============================================================================
 // VERCEL SERVERLESS SCRIPT GENERATOR: /api/scan & /scan.ps1
-// Dynamically serves scan.ps1 with the current deployment's /api/specs URL baked in
-// Users can run: irm https://<your-vercel-domain>/scan.ps1 | iex
+// Dynamically serves scan.ps1 with user/device type prompts and current domain
 // ==============================================================================
 
 export default async function handler(req, res) {
@@ -11,12 +10,15 @@ export default async function handler(req, res) {
 
   const script = `# ==============================================================================
 # CYBERSPECS HARDWARE & DISK HEALTH SCANNER - AUTO CLOUD TRANSMITTER
-# Live Agent Streamed from: ${proto}://${host}
-# Transmits directly to: ${portalUrl}
+# Live Streamed from: ${proto}://${host}
 # ==============================================================================
 
 param(
-    [string]$PortalUrl = "${portalUrl}"
+    [string]$AssignedTo = "",
+    [string]$DeviceType = "",
+    [string]$CustomName = "",
+    [string]$PortalUrl = "${portalUrl}",
+    [switch]$NonInteractive
 )
 
 Write-Host "==========================================================" -ForegroundColor Cyan
@@ -29,7 +31,47 @@ $bios = Get-CimInstance Win32_BIOS
 $sys = Get-CimInstance Win32_ComputerSystem
 $board = Get-CimInstance Win32_BaseBoard
 
-# 2. Processor & Generation
+# 2. Auto-detect Device Type (Laptop vs Desktop PC)
+$isLaptop = $false
+try {
+    $hasBattery = Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue
+    $chassis = (Get-CimInstance Win32_SystemEnclosure -ErrorAction SilentlyContinue).ChassisTypes
+    if ($hasBattery -or ($chassis -contains 8 -or $chassis -contains 9 -or $chassis -contains 10 -or $chassis -contains 11 -or $chassis -contains 12 -or $chassis -contains 14 -or $chassis -contains 30 -or $chassis -contains 31 -or $chassis -contains 32)) {
+        $isLaptop = $true
+    }
+} catch {}
+
+$autoDeviceType = if ($isLaptop) { "Laptop" } else { "Desktop PC" }
+
+# 3. Interactive User & Device Identification
+if (-not $AssignedTo -and -not $NonInteractive -and [Environment]::UserInteractive) {
+    Write-Host ""
+    Write-Host "--- USER & DEVICE IDENTIFICATION ---" -ForegroundColor Cyan
+    $defaultUser = if ($env:USERNAME) { $env:USERNAME } else { "User" }
+    $inputUser = Read-Host "Assigned User / Employee Name (e.g. Rahul, Accounts, Sales) [Default: $defaultUser]"
+    $AssignedTo = if ($inputUser -and $inputUser.Trim()) { $inputUser.Trim() } else { $defaultUser }
+
+    Write-Host "Auto-detected Device Type: $autoDeviceType" -ForegroundColor Gray
+    $inputType = Read-Host "Device Type ([1] Laptop  [2] Desktop PC  [Enter for $autoDeviceType])"
+    if ($inputType -eq "1" -or $inputType -match "lap") {
+        $DeviceType = "Laptop"
+    } elseif ($inputType -eq "2" -or $inputType -match "desk|pc") {
+        $DeviceType = "Desktop PC"
+    } else {
+        $DeviceType = $autoDeviceType
+    }
+
+    $defaultFriendly = "$AssignedTo's $DeviceType"
+    $inputName = Read-Host "Friendly Machine Name (e.g. Accounts Laptop, Bay 4 PC) [Default: $defaultFriendly]"
+    $CustomName = if ($inputName -and $inputName.Trim()) { $inputName.Trim() } else { $defaultFriendly }
+    Write-Host "✓ Assigned: $CustomName ($AssignedTo - $DeviceType)\`n" -ForegroundColor Green
+} else {
+    if (-not $AssignedTo) { $AssignedTo = if ($env:USERNAME) { $env:USERNAME } else { "Staff Member" } }
+    if (-not $DeviceType) { $DeviceType = $autoDeviceType }
+    if (-not $CustomName) { $CustomName = "$AssignedTo's $DeviceType" }
+}
+
+# 4. Processor & Generation
 $cpu = Get-CimInstance Win32_Processor | Select-Object -First 1
 $cpuName = $cpu.Name.Trim()
 
@@ -46,14 +88,14 @@ if ($cpuName -match "i[3579]-(\\d{1,2})\\d{3}") {
     $gen = "Intel Xeon Server Processor"
 }
 
-# 3. RAM / Physical Memory
+# 5. RAM / Physical Memory
 $memModules = Get-CimInstance Win32_PhysicalMemory
 $totalRamBytes = ($memModules | Measure-Object -Property Capacity -Sum).Sum
 $totalRamGB = [math]::Round($totalRamBytes / 1GB, 1)
 $ramSpeed = ($memModules | Select-Object -First 1).Speed
 $ramSlots = $memModules.Count
 
-# 4. Storage Drives & Live Health Status (SSD vs HDD)
+# 6. Storage Drives & Live Health Status (SSD vs HDD)
 $disks = @()
 try {
     $physDisks = Get-PhysicalDisk
@@ -88,7 +130,7 @@ try {
     }
 }
 
-# 5. Logical Volume Free & Used Storage Space
+# 7. Logical Volume Free & Used Storage Space
 $volumes = @()
 Get-Volume | Where-Object { $_.DriveLetter } | ForEach-Object {
     $total = [math]::Round($_.Size / 1GB, 1)
@@ -107,7 +149,7 @@ Get-Volume | Where-Object { $_.DriveLetter } | ForEach-Object {
     }
 }
 
-# 6. Operating System & Graphics
+# 8. Operating System & Graphics
 $os = Get-CimInstance Win32_OperatingSystem
 $gpu = Get-CimInstance Win32_VideoController | Select-Object -First 1
 
@@ -115,6 +157,9 @@ $gpu = Get-CimInstance Win32_VideoController | Select-Object -First 1
 $specsPayload = [PSCustomObject]@{
     scannedAt = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
     machineName = $sys.Name
+    customName = $CustomName
+    assignedTo = $AssignedTo
+    deviceType = $DeviceType
     manufacturer = $sys.Manufacturer
     model = $sys.Model
     serialNumber = $bios.SerialNumber
@@ -161,7 +206,9 @@ try {
 }
 
 Write-Host "\`n[OK] Hardware Scan Complete!" -ForegroundColor Green
-Write-Host "  -> Machine: $($sys.Name) ($($sys.Manufacturer) $($sys.Model))" -ForegroundColor Gray
+Write-Host "  -> Device Label: $CustomName ($DeviceType)" -ForegroundColor Cyan
+Write-Host "  -> Assigned User: $AssignedTo" -ForegroundColor Gray
+Write-Host "  -> System Hostname: $($sys.Name) ($($sys.Manufacturer) $($sys.Model))" -ForegroundColor Gray
 Write-Host "  -> Serial/Service Tag: $($bios.SerialNumber)" -ForegroundColor Cyan
 Write-Host "  -> CPU: $cpuName [$gen]" -ForegroundColor Gray
 Write-Host "  -> RAM: $totalRamGB GB @ $ramSpeed MHz" -ForegroundColor Gray

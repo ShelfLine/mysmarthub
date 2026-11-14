@@ -65,12 +65,14 @@ export default async function handler(req, res) {
         id,
         scannedAt: payload.scannedAt || new Date().toISOString(),
         machineName: payload.machineName || 'Remote User PC',
+        customName: payload.customName || `${payload.assignedTo || payload.machineName}'s ${payload.deviceType || 'PC'}`,
+        assignedTo: payload.assignedTo || 'Staff Member',
+        deviceType: payload.deviceType || 'Desktop PC',
         manufacturer: payload.manufacturer || 'OEM',
         model: payload.model || 'Workstation',
         serialNumber: payload.serialNumber,
         motherboard: payload.motherboard || 'System Board',
-        location: payload.location || 'Remote Employee / Office',
-        assignedTo: payload.assignedTo || payload.machineName || 'Staff Member',
+        location: payload.location || 'Office Workstation',
         processor: payload.processor || { name: 'Processor', generation: 'Modern Multi-Core' },
         memory: payload.memory || { totalGB: 4, speedMHz: 2667, type: 'DDR4' },
         storage: payload.storage || [],
@@ -82,7 +84,7 @@ export default async function handler(req, res) {
       // Upsert in memory cache
       const existingIdx = fleetCache.findIndex(m => m.serialNumber === machineRecord.serialNumber);
       if (existingIdx !== -1) {
-        fleetCache[existingIdx] = machineRecord;
+        fleetCache[existingIdx] = { ...fleetCache[existingIdx], ...machineRecord };
       } else {
         fleetCache.unshift(machineRecord);
       }
@@ -114,7 +116,57 @@ export default async function handler(req, res) {
     }
   }
 
-  // 3. DELETE: Remove machine or clear
+  // 3. PUT / PATCH: Update machine metadata (User, Device Type, Friendly Name, Location)
+  if (req.method === 'PUT' || req.method === 'PATCH') {
+    try {
+      let payload = req.body;
+      if (typeof payload === 'string') {
+        payload = JSON.parse(payload.replace(/^\uFEFF/, '').trim());
+      }
+      const { id, serialNumber, customName, assignedTo, deviceType, location } = payload;
+      const targetIdx = fleetCache.findIndex(m => m.id === id || (serialNumber && m.serialNumber === serialNumber));
+
+      if (targetIdx === -1) {
+        const fallbackId = id || ('pc-' + (serialNumber ? serialNumber.toLowerCase().replace(/[^a-z0-9]/g, '-') : Date.now()));
+        const newRecord = {
+          id: fallbackId,
+          serialNumber: serialNumber || 'UNKNOWN',
+          machineName: payload.machineName || customName || 'Remote PC',
+          customName: customName || 'Remote PC',
+          assignedTo: assignedTo || 'Staff Member',
+          deviceType: deviceType || 'Desktop PC',
+          location: location || 'Office Workstation',
+          scannedAt: new Date().toISOString()
+        };
+        fleetCache.unshift(newRecord);
+        return res.status(200).json({ success: true, message: 'Machine created with metadata', machine: newRecord });
+      }
+
+      if (customName !== undefined) fleetCache[targetIdx].customName = customName;
+      if (assignedTo !== undefined) fleetCache[targetIdx].assignedTo = assignedTo;
+      if (deviceType !== undefined) fleetCache[targetIdx].deviceType = deviceType;
+      if (location !== undefined) fleetCache[targetIdx].location = location;
+
+      if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
+        try {
+          await fetch(`${process.env.KV_REST_API_URL}/set/fleet_machines`, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${process.env.KV_REST_API_TOKEN}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(JSON.stringify(fleetCache))
+          });
+        } catch (e) {}
+      }
+
+      return res.status(200).json({ success: true, message: 'Machine metadata updated', machine: fleetCache[targetIdx] });
+    } catch (err) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
+  // 4. DELETE: Remove machine or clear
   if (req.method === 'DELETE') {
     const { id } = req.query;
     if (id) {

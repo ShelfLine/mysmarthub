@@ -18,13 +18,15 @@ const DEFAULT_MACHINES = [
   {
     id: 'pc-dell-vostro',
     scannedAt: '2026-11-15 00:37:47',
-    machineName: 'JAGDISH (Primary PC)',
+    machineName: 'JAGDISH',
+    customName: "Jagdish's Laptop",
+    assignedTo: 'Jagdish',
+    deviceType: 'Laptop',
     manufacturer: 'Dell Inc.',
     model: 'Vostro 3581',
     serialNumber: 'FHCGDX2',
     motherboard: 'Dell Inc. 0KVNNP',
     location: 'Primary Laptop / Workstation',
-    assignedTo: 'Jagdish',
     processor: {
       name: 'Intel(R) Core(TM) i3-7020U CPU @ 2.30GHz',
       generation: '7th Generation Intel Core',
@@ -93,7 +95,10 @@ const DEFAULT_MACHINES = [
   {
     id: 'pc-workstation-pro',
     scannedAt: '2026-11-10 14:15:00',
-    machineName: 'Office Heavy Workstation Pro',
+    machineName: 'DESKTOP-THCSER',
+    customName: 'Engineering 3D Render PC',
+    assignedTo: 'Engineering Lab',
+    deviceType: 'Desktop PC',
     manufacturer: 'Custom Built Architecture',
     model: 'Z790 Creator Edition',
     serialNumber: 'SN-ASUS-994201',
@@ -223,10 +228,13 @@ class SpecsStorage {
 
   static exportCsv() {
     const machines = this.get(STORAGE_KEYS.MACHINES, DEFAULT_MACHINES);
-    const headers = ['Machine Name', 'Manufacturer & Model', 'Serial Number / Service Tag', 'CPU Model', 'CPU Generation', 'RAM (GB)', 'Storage Drives & Health', 'OS'];
+    const headers = ['Friendly Label', 'Assigned User', 'Device Type', 'System Hostname', 'Manufacturer & Model', 'Serial Number / Service Tag', 'CPU Model', 'CPU Generation', 'RAM (GB)', 'Storage Drives & Health', 'OS'];
     const rows = machines.map(m => {
       const storageStr = (m.storage || []).map(s => `${s.MediaType}: ${s.Model} (${s.SizeGB}GB, Health: ${s.HealthStatus || 'Healthy'})`).join(' | ');
       return [
+        `"${m.customName || m.machineName}"`,
+        `"${m.assignedTo || '-'}"`,
+        `"${m.deviceType || 'PC'}"`,
         `"${m.machineName}"`,
         `"${m.manufacturer} ${m.model}"`,
         `"${m.serialNumber}"`,

@@ -52,12 +52,29 @@ document.addEventListener('DOMContentLoaded', () => {
     hudMachineModel: document.getElementById('hudMachineModel'),
     btnCopySerial: document.getElementById('btnCopySerial'),
 
-    // Detailed Hardware Matrices
+    // Detailed Hardware Matrices & Active Machine
+    activeMachineDeviceIcon: document.getElementById('activeMachineDeviceIcon'),
     activeMachineHeaderName: document.getElementById('activeMachineHeaderName'),
+    activeMachineDeviceTypeBadge: document.getElementById('activeMachineDeviceTypeBadge'),
+    activeMachineUserChip: document.getElementById('activeMachineUserChip'),
+    activeMachineHostname: document.getElementById('activeMachineHostname'),
+    activeMachineLocation: document.getElementById('activeMachineLocation'),
     activeMachineTimestamp: document.getElementById('activeMachineTimestamp'),
+    btnOpenEditMachineModal: document.getElementById('btnOpenEditMachineModal'),
     storageDisksContainer: document.getElementById('storageDisksContainer'),
     identityTableBody: document.getElementById('identityTableBody'),
     fleetMachinesGrid: document.getElementById('fleetMachinesGrid'),
+
+    // Edit Machine Modal
+    editMachineModal: document.getElementById('editMachineModal'),
+    editMachineModalClose: document.getElementById('editMachineModalClose'),
+    editMachineId: document.getElementById('editMachineId'),
+    editMachineHostname: document.getElementById('editMachineHostname'),
+    editMachineCustomName: document.getElementById('editMachineCustomName'),
+    editMachineDeviceType: document.getElementById('editMachineDeviceType'),
+    editMachineAssignedTo: document.getElementById('editMachineAssignedTo'),
+    editMachineLocation: document.getElementById('editMachineLocation'),
+    btnSaveMachineDetails: document.getElementById('btnSaveMachineDetails'),
 
     // Scan & Bridge Modal
     scanModal: document.getElementById('scanModal'),
@@ -123,9 +140,29 @@ document.addEventListener('DOMContentLoaded', () => {
     const m = getActiveMachine();
     if (!m) return;
 
-    // Header Meta
-    elements.activeMachineHeaderName.textContent = m.machineName;
-    elements.activeMachineTimestamp.textContent = m.scannedAt ? `Scanned: ${m.scannedAt}` : 'Live Telemetry Active';
+    // Header Meta & Device Identification
+    const isLaptop = (m.deviceType || '').toLowerCase().includes('laptop');
+    const isServer = (m.deviceType || '').toLowerCase().includes('server');
+    const icon = isLaptop ? '💻' : (isServer ? '🗄️' : '🖥️');
+
+    if (elements.activeMachineDeviceIcon) elements.activeMachineDeviceIcon.textContent = icon;
+    if (elements.activeMachineHeaderName) elements.activeMachineHeaderName.textContent = m.customName || m.machineName;
+    if (elements.activeMachineDeviceTypeBadge) {
+      elements.activeMachineDeviceTypeBadge.textContent = `${icon} ${m.deviceType || 'PC'}`;
+      elements.activeMachineDeviceTypeBadge.className = `device-type-badge ${isLaptop ? 'laptop' : 'desktop'}`;
+    }
+    if (elements.activeMachineUserChip) {
+      elements.activeMachineUserChip.textContent = `👤 ${m.assignedTo || 'Unassigned'}`;
+    }
+    if (elements.activeMachineHostname) {
+      elements.activeMachineHostname.textContent = `Host: ${m.machineName || 'DESKTOP'}`;
+    }
+    if (elements.activeMachineLocation) {
+      elements.activeMachineLocation.textContent = m.location || 'Office Workstation';
+    }
+    if (elements.activeMachineTimestamp) {
+      elements.activeMachineTimestamp.textContent = m.scannedAt ? `Scanned: ${m.scannedAt}` : 'Live Telemetry Active';
+    }
 
     // 1. CPU Card
     elements.hudCpuTitle.textContent = m.processor ? m.processor.name : 'Unknown CPU';
@@ -253,6 +290,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Motherboard & Identity Specs Table
     // -------------------------------------------------------------
     elements.identityTableBody.innerHTML = `
+      <tr><td>Friendly Device Label</td><td><strong style="color:var(--neon-cyan);">${m.customName || m.machineName}</strong></td></tr>
+      <tr><td>Device Category</td><td><span class="device-type-badge ${isLaptop ? 'laptop' : 'desktop'}">${icon} ${m.deviceType || 'Desktop PC'}</span></td></tr>
+      <tr><td>Assigned User / Owner</td><td><span class="user-owner-chip">👤 ${m.assignedTo || 'Unassigned'}</span></td></tr>
+      <tr><td>System Hostname</td><td><span class="font-mono">${m.machineName || '-'}</span></td></tr>
       <tr><td>System Serial / Service Tag</td><td><span class="serial-tag-highlight font-mono">${m.serialNumber || 'N/A'}</span></td></tr>
       <tr><td>System Manufacturer & Model</td><td>${m.manufacturer || '-'} ${m.model || '-'}</td></tr>
       <tr><td>Motherboard / Mainboard</td><td>${m.motherboard || '-'}</td></tr>
@@ -261,7 +302,7 @@ document.addEventListener('DOMContentLoaded', () => {
       <tr><td>Installed System Memory</td><td>${m.memory ? `${m.memory.totalGB} GB ${m.memory.type || ''} @ ${m.memory.speedMHz || ''} MHz` : '-'}</td></tr>
       <tr><td>Dedicated / Integrated GPU</td><td>${m.graphics || 'Integrated Graphics'}</td></tr>
       <tr><td>Operating System Platform</td><td>${m.os || 'Windows 10/11 (64-bit)'}</td></tr>
-      <tr><td>Assigned Location & User</td><td>${m.location || 'Workstation'} (${m.assignedTo || 'Assigned'})</td></tr>
+      <tr><td>Assigned Location & Dept</td><td>${m.location || 'Office Workstation'}</td></tr>
     `;
 
     renderFleetGrid();
@@ -279,13 +320,29 @@ document.addEventListener('DOMContentLoaded', () => {
       const totalDiskGB = (pc.storage || []).reduce((acc, d) => acc + (parseInt(d.SizeGB) || 0), 0);
       const diskStr = totalDiskGB >= 1000 ? `${(totalDiskGB / 1000).toFixed(1)} TB` : `${totalDiskGB} GB`;
 
+      const isLap = (pc.deviceType || '').toLowerCase().includes('laptop');
+      const isSrv = (pc.deviceType || '').toLowerCase().includes('server');
+      const tileIcon = isLap ? '💻' : (isSrv ? '🗄️' : '🖥️');
+
       card.innerHTML = `
         <div class="machine-tile-header">
-          <div>
-            <div class="machine-tile-name">${pc.machineName}</div>
-            <div class="machine-tile-sub">${pc.manufacturer} ${pc.model}</div>
+          <div style="display:flex; align-items:center; gap:8px; min-width:0;">
+            <span style="font-size:1.4rem;">${tileIcon}</span>
+            <div style="min-width:0;">
+              <div class="machine-tile-name" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                ${pc.customName || pc.machineName}
+              </div>
+              <div class="machine-tile-sub font-mono">Host: ${pc.machineName}</div>
+            </div>
           </div>
-          <span class="serial-tag-highlight">${pc.serialNumber || 'TAG'}</span>
+          <span class="serial-tag-highlight font-mono" style="font-size:0.75rem;">${pc.serialNumber || 'TAG'}</span>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:2px;">
+          <span class="device-type-badge ${isLap ? 'laptop' : 'desktop'}">
+            ${tileIcon} ${pc.deviceType || 'Desktop PC'}
+          </span>
+          <span class="user-owner-chip">👤 ${pc.assignedTo || 'Unassigned'}</span>
         </div>
 
         <div style="font-size: 0.78rem; color: var(--text-muted); display:flex; flex-direction:column; gap:4px; margin-top:4px;">
@@ -296,6 +353,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <div style="display:flex; align-items:center; justify-content:space-between; margin-top:8px; border-top:1px solid var(--divider); padding-top:8px;">
           <span style="font-size:0.72rem; color:var(--text-dim);">${pc.os || 'Windows'}</span>
           <div style="display:flex; gap:6px;">
+            <button class="cyber-btn-secondary btn-edit-tile" style="padding:3px 8px; font-size:0.72rem;">✏️ Edit</button>
             <button class="cyber-btn-secondary btn-inspect-pc" style="padding:3px 8px; font-size:0.72rem;">Inspect</button>
             <button class="cyber-btn-secondary btn-delete-pc" style="padding:3px 8px; font-size:0.72rem; color:var(--neon-rose);">✕</button>
           </div>
@@ -303,10 +361,15 @@ document.addEventListener('DOMContentLoaded', () => {
       `;
 
       card.addEventListener('click', (e) => {
-        if (e.target.closest('.btn-delete-pc')) return;
+        if (e.target.closest('.btn-delete-pc') || e.target.closest('.btn-edit-tile')) return;
         state.activeId = pc.id;
         SpecsStorage.set(STORAGE_KEYS.ACTIVE_ID, pc.id);
         renderActiveTelemetry();
+      });
+
+      card.querySelector('.btn-edit-tile').addEventListener('click', (e) => {
+        e.stopPropagation();
+        openEditModal(pc.id);
       });
 
       card.querySelector('.btn-delete-pc').addEventListener('click', (e) => {
@@ -343,16 +406,23 @@ document.addEventListener('DOMContentLoaded', () => {
         gen = SpecsStorage.parseCpuGeneration(data.processor?.name);
       }
 
+      const isLap = (data.deviceType || '').toLowerCase().includes('laptop') || (data.model || '').toLowerCase().includes('vostro') || (data.machineName || '').toLowerCase().includes('laptop');
+      const detectedType = data.deviceType || (isLap ? 'Laptop' : 'Desktop PC');
+      const assignedTo = data.assignedTo || 'Current User';
+      const customName = data.customName || `${assignedTo}'s ${detectedType}`;
+
       const importedMachine = {
         id: 'pc-' + (data.serialNumber ? data.serialNumber.toLowerCase() : Date.now()),
         scannedAt: data.scannedAt || new Date().toISOString(),
         machineName: data.machineName || 'Scanned PC',
+        customName: customName,
+        assignedTo: assignedTo,
+        deviceType: detectedType,
         manufacturer: data.manufacturer || 'OEM',
         model: data.model || 'System Model',
         serialNumber: serialNumber,
         motherboard: data.motherboard || 'Mainboard',
-        location: 'Office / Local System',
-        assignedTo: 'Current User',
+        location: data.location || 'Office / Local System',
         processor: {
           name: data.processor?.name || 'Processor',
           generation: gen,
@@ -473,23 +543,83 @@ pause >nul
       elements.cloudStatusText.textContent = 'Syncing...';
     }
 
+    // 1. If running locally as a file:/// URL, /api/specs is not reachable directly
+    if (window.location.protocol === 'file:') {
+      if (elements.cloudStatusPill) {
+        elements.cloudStatusPill.className = 'cloud-status-pill';
+        elements.cloudStatusText.textContent = 'Local Mode (file://)';
+      }
+      if (elements.syncCloudIcon) elements.syncCloudIcon.classList.remove('spin-anim');
+
+      if (isManual) {
+        // Try auto-loading from clipboard if user ran scan.ps1
+        try {
+          const clip = await navigator.clipboard.readText();
+          if (clip && (clip.includes('processor') || clip.includes('serialNumber'))) {
+            const ok = parseAndImportSpecsJson(clip);
+            if (ok) {
+              showToast('Detected hardware specs on clipboard and loaded successfully! 🎉', 'success');
+              return;
+            }
+          }
+        } catch (e) {}
+
+        showToast('Local file mode: Run "start-server.bat" to start local cloud server, or click "Paste Specs"!', 'info');
+        elements.scanModal.classList.add('open');
+      }
+      return;
+    }
+
+    // 2. Fetch from Cloud API (/api/specs)
     try {
       const res = await fetch('/api/specs');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
 
       if (data.success && Array.isArray(data.machines)) {
+        if (data.machines.length === 0) {
+          if (elements.cloudStatusPill) {
+            elements.cloudStatusPill.className = 'cloud-status-pill';
+            elements.cloudStatusText.textContent = 'Cloud Online (0 PCs)';
+          }
+          if (isManual) {
+            // Check clipboard as fallback
+            try {
+              const clip = await navigator.clipboard.readText();
+              if (clip && (clip.includes('processor') || clip.includes('serialNumber'))) {
+                const ok = parseAndImportSpecsJson(clip);
+                if (ok) {
+                  showToast('Loaded specs from your clipboard! 🎉', 'success');
+                  return;
+                }
+              }
+            } catch (e) {}
+            showToast('Cloud API online! No remote PCs have pushed specs yet. Run scan.ps1 or click Paste Specs.', 'info');
+          }
+          return;
+        }
+
         let addedCount = 0;
+        let lastReported = null;
+
         data.machines.forEach(cloudMachine => {
           if (!cloudMachine || !cloudMachine.serialNumber) return;
           const existingIdx = state.machines.findIndex(m => m.serialNumber === cloudMachine.serialNumber);
           if (existingIdx !== -1) {
             state.machines[existingIdx] = { ...state.machines[existingIdx], ...cloudMachine };
+            lastReported = state.machines[existingIdx];
           } else {
             state.machines.unshift(cloudMachine);
+            lastReported = cloudMachine;
             addedCount++;
           }
         });
+
+        // Auto-switch to newest reported machine so user sees it right away
+        if (lastReported) {
+          state.activeId = lastReported.id;
+          SpecsStorage.set(STORAGE_KEYS.ACTIVE_ID, state.activeId);
+        }
 
         SpecsStorage.set(STORAGE_KEYS.MACHINES, state.machines);
         renderActiveTelemetry();
@@ -501,25 +631,16 @@ pause >nul
         }
 
         if (isManual) {
-          if (addedCount > 0) {
-            showToast(`Discovered ${addedCount} new PC(s) from cloud! 🎉`, 'success');
-          } else {
-            showToast(`Cloud fleet is fully synchronized (${totalOnline} PCs active)`, 'info');
-          }
+          showToast(`Cloud Fleet Synced! Loaded ${data.machines.length} machine(s) from cloud. 🎉`, 'success');
         }
       }
     } catch (err) {
       if (elements.cloudStatusPill) {
-        if (window.location.protocol === 'file:') {
-          elements.cloudStatusPill.className = 'cloud-status-pill';
-          elements.cloudStatusText.textContent = 'Local Mode';
-        } else {
-          elements.cloudStatusPill.className = 'cloud-status-pill offline';
-          elements.cloudStatusText.textContent = 'Cloud Standby';
-        }
+        elements.cloudStatusPill.className = 'cloud-status-pill offline';
+        elements.cloudStatusText.textContent = 'Cloud Standby';
       }
       if (isManual) {
-        showToast('Cloud API reachable once deployed to Vercel (or running local server)', 'info');
+        showToast('Could not reach cloud API. Double-click "start-server.bat" to start local server!', 'error');
       }
     } finally {
       if (elements.syncCloudIcon) elements.syncCloudIcon.classList.remove('spin-anim');
@@ -637,6 +758,74 @@ pause >nul
       setTimeout(() => window.location.reload(), 600);
     }
   });
+
+  // -------------------------------------------------------------
+  // Edit Device & User Metadata Modal
+  // -------------------------------------------------------------
+  function openEditModal(pcId) {
+    const target = state.machines.find(m => m.id === pcId) || getActiveMachine();
+    if (!target) return;
+
+    if (elements.editMachineId) elements.editMachineId.value = target.id;
+    if (elements.editMachineHostname) elements.editMachineHostname.value = target.machineName || '';
+    if (elements.editMachineCustomName) elements.editMachineCustomName.value = target.customName || target.machineName || '';
+    if (elements.editMachineDeviceType) elements.editMachineDeviceType.value = target.deviceType || 'Desktop PC';
+    if (elements.editMachineAssignedTo) elements.editMachineAssignedTo.value = target.assignedTo || '';
+    if (elements.editMachineLocation) elements.editMachineLocation.value = target.location || '';
+
+    if (elements.editMachineModal) elements.editMachineModal.classList.add('open');
+  }
+
+  if (elements.btnOpenEditMachineModal) {
+    elements.btnOpenEditMachineModal.addEventListener('click', () => {
+      openEditModal(state.activeId);
+    });
+  }
+
+  if (elements.editMachineModalClose) {
+    elements.editMachineModalClose.addEventListener('click', () => {
+      if (elements.editMachineModal) elements.editMachineModal.classList.remove('open');
+    });
+  }
+
+  if (elements.btnSaveMachineDetails) {
+    elements.btnSaveMachineDetails.addEventListener('click', async () => {
+      const id = elements.editMachineId.value;
+      const target = state.machines.find(m => m.id === id);
+      if (!target) return;
+
+      const newCustomName = elements.editMachineCustomName.value.trim() || target.machineName;
+      const newDeviceType = elements.editMachineDeviceType.value;
+      const newAssignedTo = elements.editMachineAssignedTo.value.trim() || 'Staff Member';
+      const newLocation = elements.editMachineLocation.value.trim() || 'Office Workstation';
+
+      target.customName = newCustomName;
+      target.deviceType = newDeviceType;
+      target.assignedTo = newAssignedTo;
+      target.location = newLocation;
+
+      SpecsStorage.set(STORAGE_KEYS.MACHINES, state.machines);
+      renderActiveTelemetry();
+      if (elements.editMachineModal) elements.editMachineModal.classList.remove('open');
+      showToast(`Saved: "${newCustomName}" (${newDeviceType} • ${newAssignedTo})!`, 'success');
+
+      // Sync update with cloud API (/api/specs) if reachable
+      try {
+        await fetch('/api/specs', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: target.id,
+            serialNumber: target.serialNumber,
+            customName: newCustomName,
+            deviceType: newDeviceType,
+            assignedTo: newAssignedTo,
+            location: newLocation
+          })
+        });
+      } catch (e) {}
+    });
+  }
 
   // Modal Listeners
   elements.btnOpenScanModal.addEventListener('click', () => elements.scanModal.classList.add('open'));

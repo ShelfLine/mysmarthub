@@ -20,6 +20,25 @@ irm https://<YOUR-VERCEL-DOMAIN>/scan.ps1 | iex
 3. **Automatic Cloud Push**: Transmits the JSON payload via HTTP `POST /api/specs` straight into your central Vercel cloud dashboard.
 4. **Instant Dashboard Appearance**: The admin's dashboard automatically refreshes and displays the new computer tile with full telemetry specs!
 
+---
+
+## 👤 User & Device Type Identification (Laptop vs. Desktop)
+
+Windows default hostnames are generic (e.g. `DESKTOP-THCSER`, `DESKTOP-89KJ`). CyberSpecs gives you **two ways** to identify each machine cleanly:
+
+1. **At Scan Time (PowerShell or scan.bat)**:
+   - **Auto-Detection**: The scanner queries `Win32_Battery` and SMBIOS chassis types to automatically detect if the computer is a **Laptop** or a **Desktop PC**!
+   - **Interactive Prompt**: Prompts for:
+     - `Assigned User / Employee Name` (e.g., *Rahul*, *Accounts Dept*, *Priya*)
+     - `Device Type` (*[1] Laptop*, *[2] Desktop PC*)
+     - `Friendly Machine Label` (e.g., *Finance Laptop*, *Bay 4 Render PC*)
+   - Simply pressing <kbd>Enter</kbd> accepts the smart auto-detected defaults.
+
+2. **On the Web Dashboard (Post-Scan Edit)**:
+   - Click the **`✏️ Edit User & Device Type`** button on any computer card or the active machine header.
+   - Change the friendly label, assigned owner, device category (💻 Laptop, 🖥️ Desktop PC, 🏢 Workstation Pro, 🗄️ Server), or department at any time!
+   - Changes automatically sync with your browser storage and cloud API.
+
 > [!TIP]
 > **Prefer double-clicking a file?** Users can also download **`CyberSpecs-Scan.bat`** directly from the website header or modal, which runs the exact same scan in 1 click!
 

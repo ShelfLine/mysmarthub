@@ -99,15 +99,32 @@
     </section>
 
     <!-- ============================================================
-         Active Inspected Machine Title & Timestamp
+         Active Inspected Machine Title, Device Type & User Header
          ============================================================ -->
-    <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--divider); padding-bottom: 10px; flex-wrap: wrap; gap: 8px;">
-      <div style="display: flex; align-items: center; gap: 10px;">
-        <span style="font-size: 1.4rem;">🖥️</span>
-        <h2 style="font-size: 1.3rem; font-weight: 800; letter-spacing: -0.02em;" id="activeMachineHeaderName">JAGDISH (Primary PC)</h2>
+    <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--divider); padding-bottom: 12px; flex-wrap: wrap; gap: 12px;">
+      <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+        <span id="activeMachineDeviceIcon" style="font-size: 1.6rem;">💻</span>
+        <div>
+          <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+            <h2 style="font-size: 1.35rem; font-weight: 800; letter-spacing: -0.02em; margin: 0;" id="activeMachineHeaderName">Jagdish's Laptop</h2>
+            <span id="activeMachineDeviceTypeBadge" class="device-type-badge laptop">💻 Laptop</span>
+            <span id="activeMachineUserChip" class="user-owner-chip">👤 Jagdish</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px; margin-top: 3px; font-size: 0.78rem; color: var(--text-dim);">
+            <span id="activeMachineHostname" class="font-mono">Host: DESKTOP-JAGDISH</span>
+            <span>•</span>
+            <span id="activeMachineLocation">Office Workstation</span>
+          </div>
+        </div>
       </div>
-      <div style="font-size: 0.8rem; color: var(--text-dim); font-family: var(--font-mono);" id="activeMachineTimestamp">
-        Scanned: 2026-11-15 00:24:47
+
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <button class="cyber-btn-secondary" id="btnOpenEditMachineModal" style="padding: 6px 12px; font-size: 0.78rem;">
+          ✏️ Edit User & Device Type
+        </button>
+        <div style="font-size: 0.8rem; color: var(--text-dim); font-family: var(--font-mono);" id="activeMachineTimestamp">
+          Scanned: 2026-11-15 00:24:47
+        </div>
       </div>
     </div>
 
@@ -321,6 +338,73 @@
       <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
         <span style="font-size: 0.74rem; color: var(--text-dim);">All scans are 100% read-only WMI/CIM queries.</span>
         <button type="button" class="cyber-btn-secondary" onclick="document.getElementById('scanModal').classList.remove('open')">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       MODAL: Edit Machine User & Device Type
+       ============================================================ -->
+  <div class="modal-overlay" id="editMachineModal" role="dialog" aria-modal="true">
+    <div class="modal-dialog" style="max-width: 520px;">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div style="width: 32px; height: 32px; border-radius: var(--radius-sm); background: var(--item-active); border: 1px solid var(--neon-cyan); display: flex; align-items: center; justify-content: center; font-size: 1.1rem;">✏️</div>
+          <div>
+            <h3 class="modal-title" style="margin: 0;">Edit User & Device Type</h3>
+            <div style="font-size: 0.74rem; color: var(--text-dim);">Assign owner and device category for your fleet inventory</div>
+          </div>
+        </div>
+        <button class="modal-close-btn" id="editMachineModalClose" aria-label="Close">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <form id="editMachineForm" style="display: flex; flex-direction: column; gap: 14px;">
+          <input type="hidden" id="editMachineId">
+          
+          <div>
+            <label class="form-label">System Hostname (Detected from Windows):</label>
+            <input type="text" class="form-control font-mono" id="editMachineHostname" readonly style="opacity: 0.7; cursor: not-allowed; background: rgba(255,255,255,0.03);">
+            <span style="font-size: 0.72rem; color: var(--text-dim);">Windows system name (e.g. DESKTOP-THCSER)</span>
+          </div>
+
+          <div>
+            <label class="form-label">Friendly Device Label / Nickname:</label>
+            <input type="text" class="form-control" id="editMachineCustomName" placeholder="e.g. Rahul - Accounts Laptop, Bay 4 Heavy PC">
+            <span style="font-size: 0.72rem; color: var(--text-dim);">Display name shown across your dashboard and reports</span>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div>
+              <label class="form-label">Device Type:</label>
+              <select class="form-control" id="editMachineDeviceType">
+                <option value="Laptop">💻 Laptop</option>
+                <option value="Desktop PC">🖥️ Desktop PC</option>
+                <option value="Workstation Pro">🏢 Workstation Pro</option>
+                <option value="All-in-One PC">🖥️ All-in-One PC</option>
+                <option value="Server">🗄️ Server / Host</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="form-label">Assigned User / Owner:</label>
+              <input type="text" class="form-control" id="editMachineAssignedTo" placeholder="e.g. Rahul Sharma, Accounts">
+            </div>
+          </div>
+
+          <div>
+            <label class="form-label">Location / Department:</label>
+            <input type="text" class="form-control" id="editMachineLocation" placeholder="e.g. Bangalore Office / Finance Dept">
+          </div>
+        </form>
+      </div>
+
+      <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+        <span style="font-size: 0.74rem; color: var(--text-dim);">Updates sync with local storage & cloud API.</span>
+        <div style="display: flex; gap: 8px;">
+          <button type="button" class="cyber-btn-secondary" onclick="document.getElementById('editMachineModal').classList.remove('open')">Cancel</button>
+          <button type="button" class="cyber-btn-primary" id="btnSaveMachineDetails">Save Changes</button>
+        </div>
       </div>
     </div>
   </div>

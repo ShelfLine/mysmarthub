@@ -1,10 +1,14 @@
 ﻿# ==============================================================================
 # PC HARDWARE & DISK HEALTH SCANNER & CLOUD TRANSMITTER
-# Queries WMI/CIM, displays specs, and transmits to your online dashboard
+# Queries WMI/CIM, prompts for user/device type, and transmits to your dashboard
 # ==============================================================================
 
 param(
-    [string]$PortalUrl = ""
+    [string]$AssignedTo = "",
+    [string]$DeviceType = "",
+    [string]$CustomName = "",
+    [string]$PortalUrl = "",
+    [switch]$NonInteractive
 )
 
 Write-Host "==========================================================" -ForegroundColor Cyan
@@ -17,28 +21,71 @@ $bios = Get-CimInstance Win32_BIOS
 $sys = Get-CimInstance Win32_ComputerSystem
 $board = Get-CimInstance Win32_BaseBoard
 
-# 2. Processor & Generation
+# 2. Auto-detect Device Type (Laptop vs Desktop PC)
+$isLaptop = $false
+try {
+    $hasBattery = Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue
+    $chassis = (Get-CimInstance Win32_SystemEnclosure -ErrorAction SilentlyContinue).ChassisTypes
+    if ($hasBattery -or ($chassis -contains 8 -or $chassis -contains 9 -or $chassis -contains 10 -or $chassis -contains 11 -or $chassis -contains 12 -or $chassis -contains 14 -or $chassis -contains 30 -or $chassis -contains 31 -or $chassis -contains 32)) {
+        $isLaptop = $true
+    }
+} catch {}
+
+$autoDeviceType = if ($isLaptop) { "Laptop" } else { "Desktop PC" }
+
+# 3. Interactive User & Device Identification
+if (-not $AssignedTo -and -not $NonInteractive -and [Environment]::UserInteractive) {
+    Write-Host ""
+    Write-Host "--- USER & DEVICE IDENTIFICATION ---" -ForegroundColor Cyan
+    $defaultUser = if ($env:USERNAME) { $env:USERNAME } else { "User" }
+    $inputUser = Read-Host "Assigned User / Employee Name (e.g. Rahul, Accounts, Sales) [Default: $defaultUser]"
+    $AssignedTo = if ($inputUser -and $inputUser.Trim()) { $inputUser.Trim() } else { $defaultUser }
+
+    Write-Host "Auto-detected Device Type: $autoDeviceType" -ForegroundColor Gray
+    $inputType = Read-Host "Device Type ([1] Laptop  [2] Desktop PC  [Enter for $autoDeviceType])"
+    if ($inputType -eq "1" -or $inputType -match "lap") {
+        $DeviceType = "Laptop"
+    } elseif ($inputType -eq "2" -or $inputType -match "desk|pc") {
+        $DeviceType = "Desktop PC"
+    } else {
+        $DeviceType = $autoDeviceType
+    }
+
+    $defaultFriendly = "$AssignedTo's $DeviceType"
+    $inputName = Read-Host "Friendly Machine Name (e.g. Accounts Laptop, Bay 4 PC) [Default: $defaultFriendly]"
+    $CustomName = if ($inputName -and $inputName.Trim()) { $inputName.Trim() } else { $defaultFriendly }
+    Write-Host "✓ Assigned: $CustomName ($AssignedTo - $DeviceType)`n" -ForegroundColor Green
+} else {
+    if (-not $AssignedTo) { $AssignedTo = if ($env:USERNAME) { $env:USERNAME } else { "Staff Member" } }
+    if (-not $DeviceType) { $DeviceType = $autoDeviceType }
+    if (-not $CustomName) { $CustomName = "$AssignedTo's $DeviceType" }
+}
+
+# 4. Processor & Generation
 $cpu = Get-CimInstance Win32_Processor | Select-Object -First 1
 $cpuName = $cpu.Name.Trim()
 
-# Auto-detect Generation
-$gen = "Unknown Gen"
+$gen = "Modern Multi-Core Processor"
 if ($cpuName -match "i[3579]-(\d{1,2})\d{3}") {
     $gen = "$($matches[1])th Generation Intel Core"
+} elseif ($cpuName -match "i[3579]-(\d)\d{2}\b") {
+    $gen = "$($matches[1])st Generation Intel Core"
 } elseif ($cpuName -match "Ryzen \d (\d)\d{3}") {
     $gen = "AMD Ryzen $($matches[1])000 Series"
 } elseif ($cpuName -match "Apple M(\d)") {
     $gen = "Apple Silicon M$($matches[1])"
+} elseif ($cpuName -match "Xeon") {
+    $gen = "Intel Xeon Server Processor"
 }
 
-# 3. RAM / Physical Memory
+# 5. RAM / Physical Memory
 $memModules = Get-CimInstance Win32_PhysicalMemory
 $totalRamBytes = ($memModules | Measure-Object -Property Capacity -Sum).Sum
 $totalRamGB = [math]::Round($totalRamBytes / 1GB, 1)
 $ramSpeed = ($memModules | Select-Object -First 1).Speed
 $ramSlots = $memModules.Count
 
-# 4. Storage Drives & Live Health Status (SSD vs HDD)
+# 6. Storage Drives & Live Health Status (SSD vs HDD)
 $disks = @()
 try {
     $physDisks = Get-PhysicalDisk
@@ -73,7 +120,7 @@ try {
     }
 }
 
-# 5. Logical Volume Free & Used Storage Space
+# 7. Logical Volume Free & Used Storage Space
 $volumes = @()
 Get-Volume | Where-Object { $_.DriveLetter } | ForEach-Object {
     $total = [math]::Round($_.Size / 1GB, 1)
@@ -92,7 +139,7 @@ Get-Volume | Where-Object { $_.DriveLetter } | ForEach-Object {
     }
 }
 
-# 6. Operating System & Graphics
+# 8. Operating System & Graphics
 $os = Get-CimInstance Win32_OperatingSystem
 $gpu = Get-CimInstance Win32_VideoController | Select-Object -First 1
 
@@ -100,6 +147,9 @@ $gpu = Get-CimInstance Win32_VideoController | Select-Object -First 1
 $specsPayload = [PSCustomObject]@{
     scannedAt = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
     machineName = $sys.Name
+    customName = $CustomName
+    assignedTo = $AssignedTo
+    deviceType = $DeviceType
     manufacturer = $sys.Manufacturer
     model = $sys.Model
     serialNumber = $bios.SerialNumber
@@ -146,15 +196,35 @@ try {
 }
 
 Write-Host "`n✓ Hardware Scan Complete!" -ForegroundColor Green
-Write-Host "  -> Machine: $($sys.Name) ($($sys.Manufacturer) $($sys.Model))" -ForegroundColor Gray
+Write-Host "  -> Device Label: $CustomName ($DeviceType)" -ForegroundColor Cyan
+Write-Host "  -> Assigned User: $AssignedTo" -ForegroundColor Gray
+Write-Host "  -> System Hostname: $($sys.Name) ($($sys.Manufacturer) $($sys.Model))" -ForegroundColor Gray
 Write-Host "  -> Serial/Service Tag: $($bios.SerialNumber)" -ForegroundColor Cyan
 Write-Host "  -> CPU: $cpuName [$gen]" -ForegroundColor Gray
 Write-Host "  -> RAM: $totalRamGB GB @ $ramSpeed MHz" -ForegroundColor Gray
 Write-Host "  -> Disks: $($disks.Count) physical drive(s) healthy" -ForegroundColor Gray
 
-# If Portal URL was supplied or set in env, automatically upload via POST!
-if (-not $PortalUrl -and $env:CYBERSPECS_PORTAL) {
-    $PortalUrl = $env:CYBERSPECS_PORTAL
+# Auto-detect Cloud Portal URL
+if (-not $PortalUrl) {
+    if ($env:CYBERSPECS_PORTAL) {
+        $PortalUrl = $env:CYBERSPECS_PORTAL
+    } else {
+        # Check if local server is listening on port 3000
+        $localPortOpen = $false
+        try {
+            $tcp = New-Object System.Net.Sockets.TcpClient
+            $ar = $tcp.BeginConnect("127.0.0.1", 3000, $null, $null)
+            $wait = $ar.AsyncWaitHandle.WaitOne(400, $false)
+            if ($wait -and $tcp.Connected) {
+                $localPortOpen = $true
+            }
+            $tcp.Close()
+        } catch {}
+
+        if ($localPortOpen) {
+            $PortalUrl = "http://localhost:3000/api/specs"
+        }
+    }
 }
 
 if ($PortalUrl -and $PortalUrl.StartsWith("http")) {
