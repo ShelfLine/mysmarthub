@@ -1,0 +1,69 @@
+{
+    "scannedAt":  "2026-11-15 01:09:58",
+    "machineName":  "JAGDISH",
+    "manufacturer":  "Dell Inc.",
+    "model":  "Vostro 3581",
+    "serialNumber":  "FHCGDX2",
+    "motherboard":  "Dell Inc. 0KVNNP",
+    "processor":  {
+                      "name":  "Intel(R) Core(TM) i3-7020U CPU @ 2.30GHz",
+                      "generation":  "7th Generation Intel Core",
+                      "cores":  2,
+                      "logicalProcessors":  4,
+                      "maxClockMHz":  2304
+                  },
+    "memory":  {
+                   "totalGB":  4,
+                   "speedMHz":  2667,
+                   "slotsUsed":  null
+               },
+    "storage":  [
+                    {
+                        "Model":  "TOSHIBA MQ01ABD100",
+                        "MediaType":  "HDD",
+                        "SizeGB":  932,
+                        "BusType":  "SATA",
+                        "HealthStatus":  "Healthy",
+                        "OperationalStatus":  "OK"
+                    },
+                    {
+                        "Model":  "POWER X SS1000",
+                        "MediaType":  "SSD",
+                        "SizeGB":  119,
+                        "BusType":  "SATA",
+                        "HealthStatus":  "Healthy",
+                        "OperationalStatus":  "OK"
+                    }
+                ],
+    "volumes":  [
+                    {
+                        "DriveLetter":  "E:",
+                        "Label":  "New Volume",
+                        "TotalGB":  465.8,
+                        "FreeGB":  374.6,
+                        "UsedGB":  91.2,
+                        "UsagePercent":  20,
+                        "Health":  "Healthy"
+                    },
+                    {
+                        "DriveLetter":  "D:",
+                        "Label":  "New Volume",
+                        "TotalGB":  465.8,
+                        "FreeGB":  463.1,
+                        "UsedGB":  2.7,
+                        "UsagePercent":  1,
+                        "Health":  "Healthy"
+                    },
+                    {
+                        "DriveLetter":  "C:",
+                        "Label":  "Local Disk",
+                        "TotalGB":  118.6,
+                        "FreeGB":  49.4,
+                        "UsedGB":  69.2,
+                        "UsagePercent":  58,
+                        "Health":  "Healthy"
+                    }
+                ],
+    "graphics":  "Intel(R) HD Graphics 620",
+    "os":  "Microsoft Windows 10 Pro (64-bit)"
+}
