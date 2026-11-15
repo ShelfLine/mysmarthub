@@ -1,6 +1,7 @@
 // ==============================================================================
 // VERCEL SERVERLESS SCRIPT GENERATOR: /api/scan & /scan.ps1
 // Dynamically serves scan.ps1 with user/device type prompts and current domain
+// 100% clean ASCII - Safe for PowerShell 5.1 & PowerShell 7+ iex streaming
 // ==============================================================================
 
 export default async function handler(req, res) {
@@ -13,6 +14,7 @@ export default async function handler(req, res) {
 # Live Streamed from: ${proto}://${host}
 # ==============================================================================
 
+& {
 param(
     [string]$AssignedTo = "",
     [string]$DeviceType = "",
@@ -61,14 +63,14 @@ if (-not $AssignedTo -and -not $NonInteractive -and [Environment]::UserInteracti
         $DeviceType = $autoDeviceType
     }
 
-    $defaultFriendly = "$AssignedTo's $DeviceType"
+    $defaultFriendly = "$AssignedTo - $DeviceType"
     $inputName = Read-Host "Friendly Machine Name (e.g. Accounts Laptop, Bay 4 PC) [Default: $defaultFriendly]"
     $CustomName = if ($inputName -and $inputName.Trim()) { $inputName.Trim() } else { $defaultFriendly }
-    Write-Host "✓ Assigned: $CustomName ($AssignedTo - $DeviceType)\`n" -ForegroundColor Green
+    Write-Host "[OK] Assigned: $CustomName ($AssignedTo - $DeviceType)\`n" -ForegroundColor Green
 } else {
     if (-not $AssignedTo) { $AssignedTo = if ($env:USERNAME) { $env:USERNAME } else { "Staff Member" } }
     if (-not $DeviceType) { $DeviceType = $autoDeviceType }
-    if (-not $CustomName) { $CustomName = "$AssignedTo's $DeviceType" }
+    if (-not $CustomName) { $CustomName = "$AssignedTo - $DeviceType" }
 }
 
 # 4. Processor & Generation
@@ -194,7 +196,7 @@ try {
     $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
     [System.IO.File]::WriteAllText($outPath, $jsonOutput, $utf8NoBom)
 } catch {
-    $jsonOutput | Out-File -FilePath $outPath -Encoding utf8
+    $jsonOutput | Out-File -FilePath $outPath -Encoding ascii
 }
 
 # Copy to clipboard
@@ -221,7 +223,7 @@ if ($PortalUrl -and $PortalUrl.StartsWith("http")) {
         $response = Invoke-RestMethod -Uri $PortalUrl -Method Post -Body $jsonOutput -ContentType "application/json"
         Write-Host "[OK] Successfully uploaded to fleet: $PortalUrl" -ForegroundColor Green
     } catch {
-        Write-Host "[!] Note: Could not auto-upload to $PortalUrl ($_)" -ForegroundColor Yellow
+        Write-Host "[X] Cloud transmission note: Could not auto-upload to $PortalUrl ($_)" -ForegroundColor Yellow
         Write-Host "    (Specs are copied to clipboard and saved at: $outPath)" -ForegroundColor Gray
     }
 }
@@ -229,6 +231,8 @@ if ($PortalUrl -and $PortalUrl.StartsWith("http")) {
 if ($copied) {
     Write-Host "\`n[OK] Full specs JSON copied to your clipboard!" -ForegroundColor Cyan
 }
+
+} @args
 `;
 
   res.setHeader('Content-Type', 'text/plain; charset=utf-8');

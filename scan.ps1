@@ -3,6 +3,7 @@
 # Queries WMI/CIM, prompts for user/device type, and transmits to your dashboard
 # ==============================================================================
 
+& {
 param(
     [string]$AssignedTo = "",
     [string]$DeviceType = "",
@@ -51,14 +52,14 @@ if (-not $AssignedTo -and -not $NonInteractive -and [Environment]::UserInteracti
         $DeviceType = $autoDeviceType
     }
 
-    $defaultFriendly = "$AssignedTo's $DeviceType"
+    $defaultFriendly = "$AssignedTo - $DeviceType"
     $inputName = Read-Host "Friendly Machine Name (e.g. Accounts Laptop, Bay 4 PC) [Default: $defaultFriendly]"
     $CustomName = if ($inputName -and $inputName.Trim()) { $inputName.Trim() } else { $defaultFriendly }
-    Write-Host "✓ Assigned: $CustomName ($AssignedTo - $DeviceType)`n" -ForegroundColor Green
+    Write-Host "[OK] Assigned: $CustomName ($AssignedTo - $DeviceType)`n" -ForegroundColor Green
 } else {
     if (-not $AssignedTo) { $AssignedTo = if ($env:USERNAME) { $env:USERNAME } else { "Staff Member" } }
     if (-not $DeviceType) { $DeviceType = $autoDeviceType }
-    if (-not $CustomName) { $CustomName = "$AssignedTo's $DeviceType" }
+    if (-not $CustomName) { $CustomName = "$AssignedTo - $DeviceType" }
 }
 
 # 4. Processor & Generation
@@ -184,7 +185,7 @@ try {
     $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
     [System.IO.File]::WriteAllText($outPath, $jsonOutput, $utf8NoBom)
 } catch {
-    $jsonOutput | Out-File -FilePath $outPath -Encoding utf8
+    $jsonOutput | Out-File -FilePath $outPath -Encoding ascii
 }
 
 # Copy to clipboard
@@ -195,7 +196,7 @@ try {
     $copied = $false
 }
 
-Write-Host "`n✓ Hardware Scan Complete!" -ForegroundColor Green
+Write-Host "`n[OK] Hardware Scan Complete!" -ForegroundColor Green
 Write-Host "  -> Device Label: $CustomName ($DeviceType)" -ForegroundColor Cyan
 Write-Host "  -> Assigned User: $AssignedTo" -ForegroundColor Gray
 Write-Host "  -> System Hostname: $($sys.Name) ($($sys.Manufacturer) $($sys.Model))" -ForegroundColor Gray
@@ -231,15 +232,17 @@ if ($PortalUrl -and $PortalUrl.StartsWith("http")) {
     Write-Host "`nTransmitting hardware telemetry to online dashboard..." -ForegroundColor Yellow
     try {
         $response = Invoke-RestMethod -Uri $PortalUrl -Method Post -Body $jsonOutput -ContentType "application/json"
-        Write-Host "✓ Successfully transmitted to cloud fleet: $PortalUrl" -ForegroundColor Green
+        Write-Host "[OK] Successfully transmitted to cloud fleet: $PortalUrl" -ForegroundColor Green
     } catch {
-        Write-Host "✕ Cloud transmission note: Could not upload to $PortalUrl ($_)" -ForegroundColor Yellow
+        Write-Host "[X] Cloud transmission note: Could not upload to $PortalUrl ($_)" -ForegroundColor Yellow
         Write-Host "  (Specs are saved locally at: $outPath and copied to clipboard)" -ForegroundColor Gray
     }
 } else {
-    Write-Host "`n(Tip: Run with -PortalUrl 'https://your-site.vercel.app/api/specs' to auto-sync to your online dashboard)" -ForegroundColor DarkGray
+    Write-Host "`n(Tip: Run with -PortalUrl https://your-site.vercel.app/api/specs to auto-sync to your online dashboard)" -ForegroundColor DarkGray
 }
 
 if ($copied) {
-    Write-Host "`n✓ Full specs JSON copied to your clipboard!" -ForegroundColor Cyan
+    Write-Host "`n[OK] Full specs JSON copied to your clipboard!" -ForegroundColor Cyan
 }
+
+} @args
